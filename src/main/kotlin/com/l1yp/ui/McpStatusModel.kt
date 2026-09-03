@@ -50,7 +50,7 @@ internal object McpConfigurationFormatter {
         return """
         [mcp_servers.jetbrains_tools]
         url = "$endpoint"
-        http_headers = { Authorization = "Bearer <project-token>" }
+        http_headers = { Authorization = "Bearer <project-token>", "${McpProtocol.DIAGNOSTIC_CLIENT_HEADER}" = "codex" }
         enabled_tools = [$enabledTools]
         startup_timeout_sec = 10
         tool_timeout_sec = 120

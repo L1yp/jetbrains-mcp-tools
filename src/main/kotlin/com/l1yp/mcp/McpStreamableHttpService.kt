@@ -90,7 +90,11 @@ internal class McpStreamableHttpService : HttpRequestHandler() {
 
         val project = (securityResult as McpHttpSecurityResult.Authorized).project
         val requestBody = request.content().toString(CharsetUtil.UTF_8)
-        val requestDescription = describeRequest(requestBody)
+        val requestDescription = McpRequestLogFormatter.describe(
+            requestBody = requestBody,
+            diagnosticClientName = request.headers().get(McpProtocol.DIAGNOSTIC_CLIENT_HEADER),
+            userAgent = request.headers().get(HttpHeaderNames.USER_AGENT),
+        )
         val startedAt = System.nanoTime()
         val toolboxLog = project.service<McpToolboxLogService>()
         toolboxLog.info("MCP 请求", "开始处理 $requestDescription")
@@ -128,17 +132,6 @@ internal class McpStreamableHttpService : HttpRequestHandler() {
         sendResponse(context, request, dispatchResult.httpStatus, dispatchResult.responseBody)
         return true
     }
-
-    private fun describeRequest(requestBody: String): String = runCatching {
-        val payload = JsonParser.parseString(requestBody).asJsonObject
-        val method = payload.stringValue("method") ?: "未知方法"
-        if (method == "tools/call") {
-            val toolName = payload.getAsJsonObject("params")?.stringValue("name")
-            if (toolName.isNullOrBlank()) method else "$method($toolName)"
-        } else {
-            method
-        }
-    }.getOrDefault("无法解析的请求")
 
     private fun dispatchFailure(responseBody: String?): String? = runCatching {
         val payload = responseBody?.let(JsonParser::parseString)?.asJsonObject ?: return@runCatching null
@@ -201,6 +194,52 @@ internal class McpStreamableHttpService : HttpRequestHandler() {
     }
 }
 
+internal object McpRequestLogFormatter {
+    fun describe(
+        requestBody: String,
+        diagnosticClientName: String?,
+        userAgent: String?,
+    ): String {
+        val payload = runCatching { JsonParser.parseString(requestBody).asJsonObject }.getOrNull()
+        val method = payload?.stringValue("method") ?: "无法解析的请求"
+        val operation = if (method == "tools/call") {
+            val toolName = payload?.objectValue("params")?.stringValue("name")
+            if (toolName.isNullOrBlank()) method else "$method($toolName)"
+        } else {
+            method
+        }
+        val identity = buildList {
+            diagnosticClientName.normalizedIdentity()?.let { add("客户端标记=$it") }
+            if (method == "initialize") {
+                payload?.objectValue("params")
+                    ?.objectValue("clientInfo")
+                    ?.let(::formatClientInfo)
+                    ?.let { add("clientInfo=$it") }
+            }
+            userAgent.normalizedIdentity()?.let { add("User-Agent=$it") }
+        }
+        return if (identity.isEmpty()) "$operation · 客户端=未知" else "$operation · ${identity.joinToString(" · ")}"
+    }
+
+    private fun formatClientInfo(clientInfo: JsonObject): String? {
+        val name = clientInfo.stringValue("name").normalizedIdentity() ?: return null
+        val version = clientInfo.stringValue("version").normalizedIdentity()
+        return if (version == null) name else "$name/$version"
+    }
+
+    private fun String?.normalizedIdentity(): String? = this
+        ?.replace(Regex("[\\r\\n\\t]+"), " ")
+        ?.trim()
+        ?.take(MAX_IDENTITY_LENGTH)
+        ?.takeIf(String::isNotEmpty)
+
+    private const val MAX_IDENTITY_LENGTH = 256
+}
+
 private fun JsonObject.stringValue(name: String): String? = get(name)
     ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
     ?.asString
+
+private fun JsonObject.objectValue(name: String): JsonObject? = get(name)
+    ?.takeIf { it.isJsonObject }
+    ?.asJsonObject

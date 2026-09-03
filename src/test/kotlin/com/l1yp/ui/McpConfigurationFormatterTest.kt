@@ -16,6 +16,7 @@ class McpConfigurationFormatterTest {
         assertTrue(configuration.contains("[mcp_servers.jetbrains_tools]"))
         assertTrue(configuration.contains("url = \"http://127.0.0.1:63342/api/jetbrains-mcp-tools\""))
         assertTrue(configuration.contains("Authorization = \"Bearer <project-token>\""))
+        assertTrue(configuration.contains("\"X-MCP-Client\" = \"codex\""))
         assertTrue(configuration.contains("restart_run_configuration"))
         assertTrue(configuration.contains("get_git_repositories"))
         assertTrue(configuration.contains("get_git_remotes"))

@@ -5,6 +5,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.l1yp.agentconfig.McpEndpoint
 import com.l1yp.agentconfig.SupportLevel
+import com.l1yp.mcp.McpProtocol
 
 internal data class ManualAgentDefinition(
     val id: String,
@@ -84,6 +85,7 @@ internal object ManualConfigurationFormatter {
                 url: '${endpoint.url}'
                 headers:
                   Authorization: '${endpoint.authorizationHeader}'
+                  ${McpProtocol.DIAGNOSTIC_CLIENT_HEADER}: '${endpoint.diagnosticClientName}'
                 failOnStartupError: true
     """.trimIndent()
 
@@ -94,7 +96,8 @@ internal object ManualConfigurationFormatter {
               "type": "streamableHttp",
               "url": "$${endpoint.url}",
               "headers": {
-                "Authorization": "Bearer ${MCP_SERVICE_RESTART_TOKEN}"
+                "Authorization": "Bearer ${MCP_SERVICE_RESTART_TOKEN}",
+                "$${McpProtocol.DIAGNOSTIC_CLIENT_HEADER}": "$${endpoint.diagnosticClientName}"
               },
               "timeout": 30000
             }
@@ -105,6 +108,7 @@ internal object ManualConfigurationFormatter {
     fun toolsListCommand(endpoint: McpEndpoint): String = """
         curl -X POST '${endpoint.url}' \
           -H 'Authorization: ${endpoint.authorizationHeader}' \
+          -H '${McpProtocol.DIAGNOSTIC_CLIENT_HEADER}: ${endpoint.diagnosticClientName}' \
           -H 'Content-Type: application/json' \
           -H 'Accept: application/json, text/event-stream' \
           -H 'MCP-Protocol-Version: ${endpoint.protocolVersion}' \

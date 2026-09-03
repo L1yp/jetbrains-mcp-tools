@@ -139,6 +139,8 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 
 IDE 底部的 `MCP Toolbox` 工具窗口集中显示插件日志，包括 Settings 操作、Endpoint 自检、Agent 同步和 MCP 请求的结果与耗时。窗口最多保留当前项目本次 IDE 会话最近 2000 条日志，支持清空和复制；请求参数不会写入日志，Token、Authorization、URL user-info 和 token query 参数会在记录前脱敏。
 
+为便于区分请求来源，自动生成的 Agent 配置会携带仅用于诊断的 `X-MCP-Client` header；初始化日志还会显示客户端自报的 `clientInfo.name/version` 和可用的 `User-Agent`。这些字段只用于日志标记，可以缺失或被伪造，不参与认证与权限判断。
+
 ### 自动配置
 
 | Agent | 项目配置 | 插件节点 | 重载提示 |

@@ -148,7 +148,10 @@ internal class AgentConfigPanel(private val project: Project) {
         val row = selectedRow() ?: return showHint("请先选择一个 Agent 行")
         val manual = row.manualDefinition
         if (manual != null) {
-            showText("${manual.displayName} 人工配置预览", manual.preview(coordinator.endpointForManualConfiguration()))
+            showText(
+                "${manual.displayName} 人工配置预览",
+                manual.preview(coordinator.endpointForManualConfiguration(manual.id)),
+            )
             showFeedback(ActionFeedback.success("已打开 ${manual.displayName} 人工配置预览"))
             return
         }
@@ -221,7 +224,7 @@ internal class AgentConfigPanel(private val project: Project) {
 
     private fun copySelectedConfiguration() {
         val row = selectedRow() ?: return showHint("请先选择一个 Agent")
-        val endpoint = coordinator.endpointForManualConfiguration()
+        val endpoint = coordinator.endpointForManualConfiguration(row.id)
         val configuration = row.manualDefinition?.configuration?.invoke(endpoint)
             ?: ManualConfigurationFormatter.genericMcpServersJson(endpoint)
         copy(configuration, "已复制配置；内容可能含项目 Token，请勿提交 Git")

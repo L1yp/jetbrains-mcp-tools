@@ -12,7 +12,11 @@ class CodexConfigAdapterTest {
         val body = CodexConfigAdapter.tableBody(endpoint())
 
         assertTrue(body.contains("url = \"http://127.0.0.1:63342/api/jetbrains-mcp-tools\""))
-        assertTrue(body.contains("http_headers = { Authorization = \"Bearer token\" }"))
+        assertTrue(
+            body.contains(
+                "http_headers = { Authorization = \"Bearer token\", \"X-MCP-Client\" = \"codex\" }",
+            ),
+        )
         assertTrue(body.contains("enabled_tools = [\"get_restartable_run_configurations\", \"restart_run_configuration\"]"))
         assertTrue(body.contains("startup_timeout_sec = 10"))
         assertTrue(body.contains("tool_timeout_sec = 120"))
@@ -48,5 +52,6 @@ class CodexConfigAdapterTest {
         startupTimeoutMillis = 10_000,
         toolTimeoutMillis = 120_000,
         enabledTools = listOf("get_restartable_run_configurations", "restart_run_configuration"),
+        diagnosticClientName = CodexConfigAdapter.ID,
     )
 }

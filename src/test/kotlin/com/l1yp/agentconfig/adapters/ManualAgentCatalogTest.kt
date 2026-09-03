@@ -24,6 +24,7 @@ class ManualAgentCatalogTest {
         assertTrue(row.contains("name: '@deepseek-ai/dsh-mcp-client'"))
         assertTrue(row.contains("transport: streamable-http"))
         assertTrue(row.contains("Authorization: 'Bearer secret-token'"))
+        assertTrue(row.contains("X-MCP-Client: 'manual'"))
     }
 
     @Test

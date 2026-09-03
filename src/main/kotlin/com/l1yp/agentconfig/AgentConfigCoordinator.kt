@@ -200,12 +200,13 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
             existingNames = runCatching { adapter.existingServerNames(project) }.getOrDefault(emptySet()),
             projectPath = project.basePath.orEmpty(),
         )
-        return endpoint(serverName)
+        return endpoint(serverName, adapter.id)
     }
 
-    fun endpointForManualConfiguration(): McpEndpoint = endpoint("jetbrains_tools")
+    fun endpointForManualConfiguration(diagnosticClientName: String = "manual"): McpEndpoint =
+        endpoint("jetbrains_tools", diagnosticClientName)
 
-    private fun endpoint(serverName: String): McpEndpoint {
+    private fun endpoint(serverName: String, diagnosticClientName: String): McpEndpoint {
         val port = BuiltInServerManager.getInstance().port
         val token = project.service<McpProjectTokenService>().token()
         return McpEndpoint(
@@ -216,6 +217,7 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
             startupTimeoutMillis = 10_000,
             toolTimeoutMillis = 120_000,
             enabledTools = project.service<McpToolSettings>().enabledToolNames(),
+            diagnosticClientName = diagnosticClientName,
         )
     }
 
@@ -312,6 +314,7 @@ internal object McpEndpointSelfTest {
                 token,
                 $$"""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"jetbrains-mcp-tools-self-test","version":"1"}}}""",
                 includeProtocolVersion = false,
+                diagnosticClientName = SELF_TEST_CLIENT_NAME,
             )
             require(initialize.statusCode() == 200) { "initialize returned HTTP ${initialize.statusCode()}" }
             val initializePayload = JsonParser.parseString(initialize.body()).asJsonObject
@@ -324,6 +327,7 @@ internal object McpEndpointSelfTest {
                 token,
                 """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""",
                 includeProtocolVersion = true,
+                diagnosticClientName = SELF_TEST_CLIENT_NAME,
             )
             require(tools.statusCode() == 200) { "tools/list returned HTTP ${tools.statusCode()}" }
             val names = JsonParser.parseString(tools.body()).asJsonObject
@@ -352,16 +356,20 @@ internal object McpEndpointSelfTest {
         token: String,
         body: String,
         includeProtocolVersion: Boolean,
+        diagnosticClientName: String,
     ): HttpResponse<String> {
         val builder = HttpRequest.newBuilder(uri)
             .timeout(Duration.ofSeconds(5))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json, text/event-stream")
             .header("Authorization", "Bearer $token")
+            .header(McpProtocol.DIAGNOSTIC_CLIENT_HEADER, diagnosticClientName)
             .POST(HttpRequest.BodyPublishers.ofString(body))
         if (includeProtocolVersion) builder.header("MCP-Protocol-Version", McpProtocol.VERSION)
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
     }
+
+    private const val SELF_TEST_CLIENT_NAME = "mcp-toolbox-self-test"
 }
 
 internal class AgentConfigStartupActivity : com.intellij.openapi.startup.ProjectActivity {

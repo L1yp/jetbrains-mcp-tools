@@ -4,6 +4,7 @@ internal object McpProtocol {
     const val VERSION = "2025-11-25"
     const val ENDPOINT_PATH = "/api/jetbrains-mcp-tools"
     const val SERVER_NAME = "jetbrains-mcp-tools"
+    const val DIAGNOSTIC_CLIENT_HEADER = "X-MCP-Client"
     const val INSTRUCTIONS =
         "Call get_restartable_run_configurations before restart_run_configuration, and get_git_repositories before " +
             "get_git_remotes, git_fetch, git_pull, or git_push. Use exact returned names and repository roots. Git " +

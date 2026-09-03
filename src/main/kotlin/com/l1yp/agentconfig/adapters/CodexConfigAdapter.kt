@@ -7,6 +7,7 @@ import com.l1yp.agentconfig.FileAgentConfigAdapter
 import com.l1yp.agentconfig.McpEndpoint
 import com.l1yp.agentconfig.SupportLevel
 import com.l1yp.agentconfig.TomlConfigEditor
+import com.l1yp.mcp.McpProtocol
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -56,7 +57,7 @@ internal class CodexConfigAdapter : FileAgentConfigAdapter(
             val enabledTools = endpoint.enabledTools.joinToString(", ") { "\"${tomlEscape(it)}\"" }
             return """
                 url = "${tomlEscape(endpoint.url)}"
-                http_headers = { Authorization = "${tomlEscape(endpoint.authorizationHeader)}" }
+                http_headers = { Authorization = "${tomlEscape(endpoint.authorizationHeader)}", "${McpProtocol.DIAGNOSTIC_CLIENT_HEADER}" = "${tomlEscape(endpoint.diagnosticClientName)}" }
                 enabled_tools = [$enabledTools]
                 startup_timeout_sec = ${toSeconds(endpoint.startupTimeoutMillis)}
                 tool_timeout_sec = ${toSeconds(endpoint.toolTimeoutMillis)}

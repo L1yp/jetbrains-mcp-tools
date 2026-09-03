@@ -12,6 +12,7 @@ class TraeConfigAdapterTest {
         assertEquals("http", node.get("type").asString)
         assertEquals("http://127.0.0.1:63342/api/jetbrains-mcp-tools", node.get("url").asString)
         assertEquals("Bearer token", node.getAsJsonObject("headers").get("Authorization").asString)
+        assertEquals("trae", node.getAsJsonObject("headers").get("X-MCP-Client").asString)
         assertEquals(setOf("type", "url", "headers"), node.keySet())
     }
 
@@ -23,5 +24,6 @@ class TraeConfigAdapterTest {
         startupTimeoutMillis = 10_000,
         toolTimeoutMillis = 120_000,
         enabledTools = emptyList(),
+        diagnosticClientName = TraeConfigAdapter.ID,
     )
 }

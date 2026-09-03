@@ -3,7 +3,7 @@ package com.l1yp.agentconfig
 import com.intellij.openapi.project.Project
 import java.nio.file.Path
 
-internal data class McpEndpoint(
+internal data class McpEndpoint @JvmOverloads constructor(
     val serverName: String,
     val url: String,
     val authorizationHeader: String,
@@ -11,6 +11,7 @@ internal data class McpEndpoint(
     val startupTimeoutMillis: Long,
     val toolTimeoutMillis: Long,
     val enabledTools: List<String>,
+    val diagnosticClientName: String = "manual",
 )
 
 internal enum class SupportLevel {
