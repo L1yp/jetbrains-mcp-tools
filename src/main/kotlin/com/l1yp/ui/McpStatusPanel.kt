@@ -43,7 +43,7 @@ internal class McpStatusPanel(
             .addLabeledComponent("IDE 进程：", processIdentity)
             .addLabeledComponent("当前项目：", projectIdentity)
             .addLabeledComponent("插件版本：", pluginVersion)
-            .addLabeledComponent("固定工具：", toolsStatus)
+            .addLabeledComponent("可用工具：", toolsStatus)
             .panel
 
         val actions = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(8), 0)).apply {
@@ -110,8 +110,9 @@ internal class McpStatusPanel(
                   <li>Agent 通过项目 Bearer Token 自动绑定当前项目，无需传递项目路径。</li>
                   <li>先调用 <code>get_restartable_run_configurations</code> 获取准确配置名。</li>
                   <li>再调用 <code>restart_run_configuration</code> 启动或重启该配置。</li>
+                  <li>Git 远程操作前调用 <code>get_git_repositories</code>；fetch、pull、push 的认证由 IDEA 接管。</li>
                 </ol>
-                <p><b>安全原则：</b>端口、Token 和 Agent 本地配置不得进入 Git。</p>
+                <p><b>安全原则：</b>端口、Token 和 Agent 本地配置不得进入 Git；MCP 工具不会接收或返回 Git 凭据。</p>
                 <p><b>旧版本升级：</b>Node Proxy 和实例注册表已停用；确认没有旧版插件在使用后，可手动删除
                 <code>~/.mcp-service-restart/mcp-service-restart-proxy.mjs</code> 与 <code>instances/</code>。</p>
                 </html>

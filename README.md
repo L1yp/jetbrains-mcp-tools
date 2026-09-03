@@ -2,7 +2,7 @@
 
 ![MCP Toolbox 图标](src/main/resources/META-INF/pluginIcon.svg)
 
-MCP Toolbox 是一个面向 JetBrains IDE 自动化的可扩展 MCP 工具插件，通过 IDE Built-in Web Server 提供安全、项目感知的 MCP `2025-11-25` Streamable HTTP endpoint。当前首批工具用于查询、启动或重启项目 Run Configuration，后续可以在同一协议、安全与 Agent 配置框架中增加其他 IDE 工具。
+MCP Toolbox 是一个面向 JetBrains IDE 自动化的可扩展 MCP 工具插件，通过 IDE Built-in Web Server 提供安全、项目感知的 MCP `2025-11-25` Streamable HTTP endpoint。工具可查询、启动或重启项目 Run Configuration，也可通过 IDEA 已保存的凭据执行 Git fetch、pull 和 push。
 
 计划发布仓库：[`L1yp/jetbrains-mcp-tools`](https://github.com/L1yp/jetbrains-mcp-tools)
 
@@ -36,7 +36,7 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 
 ## 工具
 
-插件固定公开两个工具，Agent 不需要也不能传入 `projectPath`。Bearer Token 在 HTTP 层绑定唯一项目。
+插件公开 Run Configuration 与 Git 工具，Agent 不需要也不能传入 `projectPath`。Bearer Token 在 HTTP 层绑定唯一项目。
 
 ### `get_restartable_run_configurations`
 
@@ -73,6 +73,47 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 - 同一配置存在多个并行运行实例。
 
 成功结果同时包含文本 `content` 和 `structuredContent`。
+
+### `get_git_repositories`
+
+输入为 `{}`。返回 IDEA 当前管理的 Git 仓库根路径、状态、HEAD、当前分支、上游分支和 remote 名称。后续 Git 工具的 `repositoryRoot` 必须使用这里返回的精确值；单仓库项目可以省略，多仓库项目必须显式指定。
+
+### `git_fetch`
+
+从已配置的 remote 获取引用。`remote` 省略时依次选择当前分支的上游 remote、`origin` 或唯一 remote；`prune` 默认 `false`。工具不接收任意 URL 或凭据。
+
+```json
+{
+  "repositoryRoot": "E:/workspace/order-service",
+  "remote": "origin",
+  "prune": true
+}
+```
+
+### `git_pull`
+
+从当前分支已配置的 upstream 拉取。默认 `strategy=ff_only`，也可以明确选择 `rebase` 或 `merge`；没有 upstream、处于 detached HEAD 或 Git 产生冲突时返回业务错误。
+
+```json
+{
+  "repositoryRoot": "E:/workspace/order-service",
+  "strategy": "ff_only"
+}
+```
+
+### `git_push`
+
+把当前本地分支推送到已配置的 remote，不支持 force、不跳过 hooks，也不接受任意 refspec。新分支可用 `setUpstream=true` 建立跟踪关系。
+
+```json
+{
+  "repositoryRoot": "E:/workspace/order-service",
+  "remote": "origin",
+  "setUpstream": true
+}
+```
+
+三个远程工具都通过 Git4Idea 的命令执行链运行。IDEA 会使用其 Git Password Safe、HTTP askpass 和原生 SSH askpass 处理认证，包括已保存的加密私钥口令；MCP 输入、输出和日志不会包含凭据。命令输出中的 URL user-info 也会脱敏。
 
 ## 设置与 Agent 配置
 

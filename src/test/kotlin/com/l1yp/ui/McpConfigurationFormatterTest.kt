@@ -16,6 +16,10 @@ class McpConfigurationFormatterTest {
         assertTrue(configuration.contains("url = \"http://127.0.0.1:63342/api/jetbrains-mcp-tools\""))
         assertTrue(configuration.contains("Authorization = \"Bearer <project-token>\""))
         assertTrue(configuration.contains("restart_run_configuration"))
+        assertTrue(configuration.contains("get_git_repositories"))
+        assertTrue(configuration.contains("git_fetch"))
+        assertTrue(configuration.contains("git_pull"))
+        assertTrue(configuration.contains("git_push"))
         assertFalse(configuration.contains("command = \"node\""))
         assertFalse(configuration.contains("C:/Users/"))
     }

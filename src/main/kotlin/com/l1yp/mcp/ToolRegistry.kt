@@ -2,7 +2,11 @@ package com.l1yp.mcp
 
 import com.google.gson.JsonObject
 import com.intellij.openapi.project.Project
+import com.l1yp.tool.GetGitRepositoriesTool
 import com.l1yp.tool.GetRestartableRunConfigurationsTool
+import com.l1yp.tool.GitFetchTool
+import com.l1yp.tool.GitPullTool
+import com.l1yp.tool.GitPushTool
 import com.l1yp.tool.RestartRunConfigurationTool
 
 internal data class McpToolDefinition(
@@ -41,6 +45,10 @@ internal class ToolRegistry(
     tools: List<McpTool> = listOf(
         GetRestartableRunConfigurationsTool(),
         RestartRunConfigurationTool(),
+        GetGitRepositoriesTool(),
+        GitFetchTool(),
+        GitPullTool(),
+        GitPushTool(),
     ),
 ) {
     private val toolsByName = tools.associateBy { it.definition.name }

@@ -5,11 +5,16 @@
 
     <description><![CDATA[
         Provides secure, project-aware MCP tools for JetBrains IDE automation through
-        a self-contained MCP 2025-11-25 Streamable HTTP endpoint. The initial tool set
-        discovers, starts, and restarts IntelliJ IDEA Run Configurations.
+        a self-contained MCP 2025-11-25 Streamable HTTP endpoint. The tool set manages
+        IntelliJ IDEA Run Configurations and authenticated Git remote operations.
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>0.5.0</h3>
+        <ul>
+            <li>Adds project-bound Git repository discovery, fetch, fast-forward/rebase/merge pull, and non-force push tools.</li>
+            <li>Routes Git authentication through the IDE credential and SSH askpass integration.</li>
+        </ul>
         <h3>0.4.0</h3>
         <ul>
             <li>Provides an independent MCP 2025-11-25 Streamable HTTP server.</li>
@@ -19,6 +24,7 @@
     ]]></change-notes>
 
     <depends>com.intellij.modules.lang</depends>
+    <depends>Git4Idea</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <httpRequestHandler implementation="com.l1yp.mcp.McpStreamableHttpService"/>

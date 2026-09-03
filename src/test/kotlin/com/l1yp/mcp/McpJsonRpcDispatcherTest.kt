@@ -124,12 +124,19 @@ class McpJsonRpcDispatcherTest {
     }
 
     @Test
-    fun `lists exactly two tools with complete contracts`() {
+    fun `lists all tools with complete contracts`() {
         val result = dispatcher.dispatch(request(7, "tools/list"), McpProtocol.VERSION, null)
 
         val tools = result.payload().getAsJsonObject("result").getAsJsonArray("tools")
         assertEquals(
-            listOf("get_restartable_run_configurations", "restart_run_configuration"),
+            listOf(
+                "get_restartable_run_configurations",
+                "restart_run_configuration",
+                "get_git_repositories",
+                "git_fetch",
+                "git_pull",
+                "git_push",
+            ),
             tools.map { it.asJsonObject.get("name").asString },
         )
         tools.forEach { tool ->

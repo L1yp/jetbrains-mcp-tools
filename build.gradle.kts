@@ -21,6 +21,7 @@ dependencies {
 
     intellijPlatform {
         intellijIdeaUltimate(providers.gradleProperty("platformVersion"))
+        bundledPlugin("Git4Idea")
         pluginVerifier()
         testFramework(TestFrameworkType.Platform)
     }

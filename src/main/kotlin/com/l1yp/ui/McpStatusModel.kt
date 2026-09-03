@@ -32,27 +32,32 @@ internal object McpStatusProvider {
 }
 
 internal object McpConfigurationFormatter {
-    fun codexConfiguration(projectName: String, endpoint: String): String = """
+    fun codexConfiguration(projectName: String, endpoint: String): String {
+        val enabledTools = ToolRegistry.DEFAULT.definitions.joinToString(", ") { "\"${it.name}\"" }
+        return """
         [mcp_servers.jetbrains_tools]
         url = "$endpoint"
         http_headers = { Authorization = "Bearer <project-token>" }
-        enabled_tools = ["get_restartable_run_configurations", "restart_run_configuration"]
+        enabled_tools = [$enabledTools]
         startup_timeout_sec = 10
         tool_timeout_sec = 120
 
         # Project: $projectName
         # 本机端口和 Token 不应提交到 Git。
     """.trimIndent()
+    }
 
-    fun httpDetails(endpoint: String): String = """
-        Endpoint: $endpoint
-        Protocol: MCP 2025-11-25
-        Transport: Streamable HTTP
-        Authorization: Bearer <project-token>
-        Tools:
-          - get_restartable_run_configurations
-          - restart_run_configuration
-    """.trimIndent()
+    fun httpDetails(endpoint: String): String {
+        val tools = ToolRegistry.DEFAULT.definitions.joinToString("\n") { "  - ${it.name}" }
+        return """
+            Endpoint: $endpoint
+            Protocol: MCP 2025-11-25
+            Transport: Streamable HTTP
+            Authorization: Bearer <project-token>
+            Tools:
+            $tools
+        """.trimIndent()
+    }
 }
 
 internal data class McpStatusSnapshot(
