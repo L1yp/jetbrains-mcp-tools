@@ -2,6 +2,7 @@ package com.l1yp.ui
 
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
@@ -148,18 +149,23 @@ internal class AgentConfigPanel(private val project: Project) {
             showFeedback(ActionFeedback.success("已打开 ${manual.displayName} 人工配置预览"))
             return
         }
+        val modalityState = ModalityState.stateForComponent(component)
         runBackground("正在生成预览…") {
             val change = coordinator.preview(row.id)
-            ApplicationManager.getApplication().invokeLater {
-                when (change) {
-                    is ConfigChange.Ready -> showText(
-                        "${row.displayName} 配置变更预览",
-                        "变更前：\n${change.beforePreview.ifBlank { "（文件不存在）" }}\n\n变更后：\n${change.afterPreview}",
-                    )
-                    is ConfigChange.Unchanged -> showText("${row.displayName} 配置变更预览", "配置已同步，无需修改。")
-                    is ConfigChange.Blocked -> showText("${row.displayName} 配置变更预览", change.reason)
-                }
-            }
+            ApplicationManager.getApplication().invokeLater(
+                {
+                    when (change) {
+                        is ConfigChange.Ready -> showText(
+                            "${row.displayName} 配置变更预览",
+                            "变更前：\n${change.beforePreview.ifBlank { "（文件不存在）" }}\n\n变更后：\n${change.afterPreview}",
+                        )
+                        is ConfigChange.Unchanged ->
+                            showText("${row.displayName} 配置变更预览", "配置已同步，无需修改。")
+                        is ConfigChange.Blocked -> showText("${row.displayName} 配置变更预览", change.reason)
+                    }
+                },
+                modalityState,
+            )
             ActionFeedback.success("预览已生成")
         }
     }
@@ -256,19 +262,31 @@ internal class AgentConfigPanel(private val project: Project) {
     }
 
     private fun runBackground(startMessage: String, action: () -> ActionFeedback) {
+        val modalityState = ModalityState.stateForComponent(component)
         setBusy(true)
         showFeedback(ActionFeedback.inProgress(startMessage))
         AppExecutorUtil.getAppExecutorService().execute {
             val feedback = runCatching(action).getOrElse { error ->
                 ActionFeedback.failure(error.message ?: error.javaClass.simpleName)
             }
-            ApplicationManager.getApplication().invokeLater {
-                if (!project.isDisposed) {
-                    refresh(preserveSelection = true, announce = false)
-                    setBusy(false)
-                    showFeedback(feedback)
-                }
-            }
+            ApplicationManager.getApplication().invokeLater(
+                {
+                    if (!project.isDisposed) {
+                        val refreshFailure = runCatching {
+                            refresh(preserveSelection = true, announce = false)
+                        }.exceptionOrNull()
+                        setBusy(false)
+                        showFeedback(
+                            refreshFailure?.let { error ->
+                                ActionFeedback.failure(
+                                    "操作已结束，但刷新状态失败：${error.message ?: error.javaClass.simpleName}",
+                                )
+                            } ?: feedback,
+                        )
+                    }
+                },
+                modalityState,
+            )
         }
     }
 
