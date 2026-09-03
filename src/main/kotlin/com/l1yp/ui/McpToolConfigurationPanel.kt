@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import com.l1yp.logging.McpToolboxLogService
 import com.l1yp.mcp.McpToolDefinition
 import com.l1yp.mcp.McpToolSettings
 import com.l1yp.mcp.ToolRegistry
@@ -138,6 +139,13 @@ internal class McpToolConfigurationPanel(private val project: Project) {
         statusHint.foreground = when (kind) {
             StatusKind.SUCCESS -> JBColor(0x2E7D32, 0x59A869)
             StatusKind.INFO -> JBColor.GRAY
+        }
+        runCatching {
+            val log = project.service<McpToolboxLogService>()
+            when (kind) {
+                StatusKind.SUCCESS -> log.success("工具配置", message)
+                StatusKind.INFO -> log.info("工具配置", message)
+            }
         }
     }
 

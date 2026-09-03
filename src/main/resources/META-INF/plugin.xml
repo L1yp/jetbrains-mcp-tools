@@ -28,6 +28,10 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <httpRequestHandler implementation="com.l1yp.mcp.McpStreamableHttpService"/>
+        <toolWindow
+                id="MCP Toolbox"
+                anchor="bottom"
+                factoryClass="com.l1yp.ui.McpLogToolWindowFactory"/>
         <fileEditorProvider implementation="com.l1yp.ui.McpGuideEditorProvider"/>
         <postStartupActivity implementation="com.l1yp.execution.RunStateTrackerStartupActivity"/>
         <postStartupActivity implementation="com.l1yp.mcp.McpProjectTokenStartupActivity"/>

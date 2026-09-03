@@ -2,10 +2,12 @@ package com.l1yp.mcp
 
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
+import com.l1yp.logging.McpToolboxLogService
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelFutureListener
 import io.netty.channel.ChannelHandlerContext
@@ -87,22 +89,68 @@ internal class McpStreamableHttpService : HttpRequestHandler() {
         }
 
         val project = (securityResult as McpHttpSecurityResult.Authorized).project
+        val requestBody = request.content().toString(CharsetUtil.UTF_8)
+        val requestDescription = describeRequest(requestBody)
+        val startedAt = System.nanoTime()
+        val toolboxLog = project.service<McpToolboxLogService>()
+        toolboxLog.info("MCP 请求", "开始处理 $requestDescription")
+        var processingFailure: String? = null
         val dispatchResult = try {
             dispatcher.dispatch(
-                requestBody = request.content().toString(CharsetUtil.UTF_8),
+                requestBody = requestBody,
                 protocolVersionHeader = request.headers().get(MCP_PROTOCOL_VERSION_HEADER),
                 project = project,
             )
         } catch (error: Exception) {
             LOG.warn("MCP request processing failed", error)
+            processingFailure = "处理异常：${error.javaClass.simpleName}"
             McpDispatchResult(
                 httpStatus = 500,
                 responseBody = errorBody(JsonRpcErrorCode.INTERNAL_ERROR, "Internal error"),
             )
         }
+        val elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000
+        val failure = processingFailure ?: dispatchFailure(dispatchResult.responseBody)
+        when {
+            failure != null -> toolboxLog.error(
+                "MCP 请求",
+                "$requestDescription 失败：$failure，HTTP ${dispatchResult.httpStatus}，耗时 ${elapsedMillis}ms",
+            )
+            dispatchResult.httpStatus >= 400 -> toolboxLog.warning(
+                "MCP 请求",
+                "$requestDescription 返回 HTTP ${dispatchResult.httpStatus}，耗时 ${elapsedMillis}ms",
+            )
+            else -> toolboxLog.success(
+                "MCP 请求",
+                "$requestDescription 完成，HTTP ${dispatchResult.httpStatus}，耗时 ${elapsedMillis}ms",
+            )
+        }
         sendResponse(context, request, dispatchResult.httpStatus, dispatchResult.responseBody)
         return true
     }
+
+    private fun describeRequest(requestBody: String): String = runCatching {
+        val payload = JsonParser.parseString(requestBody).asJsonObject
+        val method = payload.stringValue("method") ?: "未知方法"
+        if (method == "tools/call") {
+            val toolName = payload.getAsJsonObject("params")?.stringValue("name")
+            if (toolName.isNullOrBlank()) method else "$method($toolName)"
+        } else {
+            method
+        }
+    }.getOrDefault("无法解析的请求")
+
+    private fun dispatchFailure(responseBody: String?): String? = runCatching {
+        val payload = responseBody?.let(JsonParser::parseString)?.asJsonObject ?: return@runCatching null
+        payload.getAsJsonObject("error")?.stringValue("message")?.let { return@runCatching it }
+        val result = payload.getAsJsonObject("result") ?: return@runCatching null
+        if (result.get("isError")?.asBoolean != true) return@runCatching null
+        result.getAsJsonArray("content")
+            ?.firstOrNull()
+            ?.asJsonObject
+            ?.stringValue("text")
+            ?: "工具返回错误"
+    }.getOrNull()
 
     private fun sendResponse(
         context: ChannelHandlerContext,
@@ -152,3 +200,7 @@ internal class McpStreamableHttpService : HttpRequestHandler() {
         val LOG = logger<McpStreamableHttpService>()
     }
 }
+
+private fun JsonObject.stringValue(name: String): String? = get(name)
+    ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+    ?.asString

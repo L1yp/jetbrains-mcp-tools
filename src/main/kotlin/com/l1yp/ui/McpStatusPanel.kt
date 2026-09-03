@@ -1,5 +1,6 @@
 package com.l1yp.ui
 
+import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
@@ -10,6 +11,7 @@ import com.intellij.ui.components.JBTabbedPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
+import com.l1yp.logging.McpToolboxLogService
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -84,6 +86,10 @@ internal class McpStatusPanel(
             projectIdentity.text = project.name
             pluginVersion.text = "未知"
             toolsStatus.text = "未知"
+            project.service<McpToolboxLogService>().error(
+                "连接状态",
+                "刷新失败：${error.message ?: error.javaClass.simpleName}",
+            )
             return
         }
         httpStatus.text = "已注册 · ${snapshot.endpoint}"
@@ -95,6 +101,10 @@ internal class McpStatusPanel(
         httpArea.text = snapshot.httpDetails
         toolsArea.text = snapshot.toolDefinitions
         copyHint.text = "状态已刷新"
+        project.service<McpToolboxLogService>().success(
+            "连接状态",
+            "状态已刷新，Endpoint=${snapshot.endpoint}，已启用 ${snapshot.toolCount}/${snapshot.supportedToolCount} 个工具",
+        )
     }
 
     private fun guidePanel(): JComponent = JPanel(BorderLayout()).apply {
@@ -152,24 +162,24 @@ internal class McpStatusPanel(
     private companion object {
         fun codeArea(): JBTextArea = JBTextArea().apply {
             isEditable = false
-            font = textAreaFont()
+            font = mcpTextAreaFont()
             lineWrap = false
             tabSize = 2
             border = JBUI.Borders.empty(8)
         }
-
-        fun textAreaFont(): Font {
-            val editorFont = EditorFontType.getGlobalPlainFont()
-            if (editorFont.canDisplayUpTo(CJK_FONT_SAMPLE) == -1) return editorFont
-
-            return listOfNotNull(
-                Font(Font.MONOSPACED, Font.PLAIN, editorFont.size),
-                UIManager.getFont("TextArea.font"),
-                Font(Font.DIALOG, Font.PLAIN, editorFont.size),
-            ).firstOrNull { candidate -> candidate.canDisplayUpTo(CJK_FONT_SAMPLE) == -1 }
-                ?: editorFont
-        }
-
-        const val CJK_FONT_SAMPLE = "中文：返回错误响应"
     }
 }
+
+internal fun mcpTextAreaFont(): Font {
+    val editorFont = EditorFontType.getGlobalPlainFont()
+    if (editorFont.canDisplayUpTo(CJK_FONT_SAMPLE) == -1) return editorFont
+
+    return listOfNotNull(
+        Font(Font.MONOSPACED, Font.PLAIN, editorFont.size),
+        UIManager.getFont("TextArea.font"),
+        Font(Font.DIALOG, Font.PLAIN, editorFont.size),
+    ).firstOrNull { candidate -> candidate.canDisplayUpTo(CJK_FONT_SAMPLE) == -1 }
+        ?: editorFont
+}
+
+private const val CJK_FONT_SAMPLE = "中文：返回错误响应"

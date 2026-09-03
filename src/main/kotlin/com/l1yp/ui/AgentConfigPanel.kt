@@ -9,6 +9,7 @@ import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
@@ -23,6 +24,7 @@ import com.l1yp.agentconfig.ConfigChange
 import com.l1yp.agentconfig.adapters.ManualAgentCatalog
 import com.l1yp.agentconfig.adapters.ManualAgentDefinition
 import com.l1yp.agentconfig.adapters.ManualConfigurationFormatter
+import com.l1yp.logging.McpToolboxLogService
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -76,6 +78,7 @@ internal class AgentConfigPanel(private val project: Project) {
             add(actionButton("复制 tools/list 命令", ::copyToolsListCommand))
             add(actionButton("测试 MCP Endpoint", ::testEndpoint))
             add(actionButton("轮换 Token", ::rotateToken))
+            add(actionButton("打开 MCP 日志", ::openLogWindow))
         }
         val statusPanel = JPanel(BorderLayout(JBUI.scale(6), 0)).apply {
             border = JBUI.Borders.empty(6, 4, 0, 4)
@@ -261,6 +264,13 @@ internal class AgentConfigPanel(private val project: Project) {
         runBackground("正在轮换 Token 并同步…") { summarize(coordinator.rotateToken()) }
     }
 
+    private fun openLogWindow() {
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MCP_LOG_TOOL_WINDOW_ID)
+            ?: return showHint("MCP Toolbox 日志窗口尚未注册")
+        toolWindow.show()
+        showFeedback(ActionFeedback.success("已打开 MCP Toolbox 日志窗口"))
+    }
+
     private fun runBackground(startMessage: String, action: () -> ActionFeedback) {
         val modalityState = ModalityState.stateForComponent(component)
         setBusy(true)
@@ -347,6 +357,15 @@ internal class AgentConfigPanel(private val project: Project) {
             FeedbackKind.FAILURE -> JBColor(0xC62828, 0xFF6B68)
             FeedbackKind.WARNING -> JBColor(0x9A6700, 0xD7BA7D)
             FeedbackKind.IN_PROGRESS -> JBColor.GRAY
+        }
+        runCatching {
+            val log = project.service<McpToolboxLogService>()
+            when (feedback.kind) {
+                FeedbackKind.SUCCESS -> log.success("Coding Agent", message)
+                FeedbackKind.FAILURE -> log.error("Coding Agent", message)
+                FeedbackKind.WARNING -> log.warning("Coding Agent", message)
+                FeedbackKind.IN_PROGRESS -> log.info("Coding Agent", message)
+            }
         }
     }
 

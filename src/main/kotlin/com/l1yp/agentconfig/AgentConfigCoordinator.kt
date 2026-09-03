@@ -17,6 +17,7 @@ import com.l1yp.agentconfig.adapters.QoderConfigAdapter
 import com.l1yp.agentconfig.adapters.TraeConfigAdapter
 import com.l1yp.agentconfig.adapters.ZCodeConfigAdapter
 import com.l1yp.agentconfig.adapters.ManualAgentCatalog
+import com.l1yp.logging.McpToolboxLogService
 import com.l1yp.mcp.McpProjectTokenService
 import com.l1yp.mcp.McpProtocol
 import com.l1yp.mcp.McpToolSettings
@@ -148,15 +149,19 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
     }
 
     fun syncSelected(requireSelfTest: Boolean = true): Map<String, ApplyResult> {
+        val log = project.service<McpToolboxLogService>()
         val automaticIds = adapters.mapTo(mutableSetOf()) { it.id }
         val selected = selectedAgentIds().intersect(automaticIds)
         if (selected.isEmpty()) {
             lastSynchronizedPort.set(BuiltInServerManager.getInstance().port)
+            log.info("Agent 同步", "没有选中的自动配置 Agent，跳过同步")
             return emptyMap()
         }
+        log.info("Agent 同步", "开始同步 ${selected.size} 个 Agent：${selected.joinToString()}")
         if (requireSelfTest) {
             val selfTest = McpEndpointSelfTest.test(project)
             if (selfTest != null) {
+                log.error("Agent 同步", "Endpoint 自检失败，已取消同步：$selfTest")
                 return selected.associateWith { id -> ApplyResult.Failed(adapter(id)?.locate(project)?.path, selfTest) }
             }
         }
@@ -164,6 +169,10 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
         selected.forEach { id -> results[id] = sync(id, requireSelfTest = false) }
         if (results.values.none { it is ApplyResult.Failed }) {
             lastSynchronizedPort.set(BuiltInServerManager.getInstance().port)
+            log.success("Agent 同步", "已完成 ${results.size} 个 Agent 的同步")
+        } else {
+            val failedIds = results.filterValues { it is ApplyResult.Failed }.keys
+            log.error("Agent 同步", "同步失败：${failedIds.joinToString()}")
         }
         return results
     }
@@ -178,6 +187,7 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
     }
 
     fun rotateToken(): Map<String, ApplyResult> {
+        project.service<McpToolboxLogService>().warning("安全配置", "正在轮换项目 Token")
         project.service<McpProjectTokenService>().rotate()
         return syncSelected(requireSelfTest = true)
     }
@@ -223,7 +233,13 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
                 syncSelected(requireSelfTest = true)
             }
             leaseWasOwned = owned
-        }.onFailure { error -> LOG.warn("Unable to synchronize MCP Agent configurations", error) }
+        }.onFailure { error ->
+            project.service<McpToolboxLogService>().error(
+                "Agent 自动同步",
+                "后台同步异常：${error.message ?: error.javaClass.simpleName}",
+            )
+            LOG.warn("Unable to synchronize MCP Agent configurations", error)
+        }
     }
 
     private fun statusFromChange(change: ConfigChange): Pair<AgentSyncStatus, String?> = when (change) {
@@ -281,40 +297,54 @@ internal object ServerNameSelector {
 }
 
 internal object McpEndpointSelfTest {
-    fun test(project: Project): String? = runCatching {
-        val port = BuiltInServerManager.getInstance().port
-        val uri = URI("http://127.0.0.1:$port${McpProtocol.ENDPOINT_PATH}")
-        val token = project.service<McpProjectTokenService>().token()
-        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build()
-        val initialize = send(
-            client,
-            uri,
-            token,
-            $$"""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"jetbrains-mcp-tools-self-test","version":"1"}}}""",
-            includeProtocolVersion = false,
-        )
-        require(initialize.statusCode() == 200) { "initialize returned HTTP ${initialize.statusCode()}" }
-        val initializePayload = JsonParser.parseString(initialize.body()).asJsonObject
-        require(initializePayload.getAsJsonObject("result")?.get("protocolVersion")?.asString == McpProtocol.VERSION) {
-            "initialize returned an unexpected protocol version"
+    fun test(project: Project): String? {
+        val log = project.service<McpToolboxLogService>()
+        val startedAt = System.nanoTime()
+        log.info("Endpoint 自检", "开始执行 initialize → tools/list")
+        val failure = runCatching<String?> {
+            val port = BuiltInServerManager.getInstance().port
+            val uri = URI("http://127.0.0.1:$port${McpProtocol.ENDPOINT_PATH}")
+            val token = project.service<McpProjectTokenService>().token()
+            val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build()
+            val initialize = send(
+                client,
+                uri,
+                token,
+                $$"""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"jetbrains-mcp-tools-self-test","version":"1"}}}""",
+                includeProtocolVersion = false,
+            )
+            require(initialize.statusCode() == 200) { "initialize returned HTTP ${initialize.statusCode()}" }
+            val initializePayload = JsonParser.parseString(initialize.body()).asJsonObject
+            require(initializePayload.getAsJsonObject("result")?.get("protocolVersion")?.asString == McpProtocol.VERSION) {
+                "initialize returned an unexpected protocol version"
+            }
+            val tools = send(
+                client,
+                uri,
+                token,
+                """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""",
+                includeProtocolVersion = true,
+            )
+            require(tools.statusCode() == 200) { "tools/list returned HTTP ${tools.statusCode()}" }
+            val names = JsonParser.parseString(tools.body()).asJsonObject
+                .getAsJsonObject("result")
+                .getAsJsonArray("tools")
+                .map { it.asJsonObject.get("name").asString }
+            require(names == project.service<McpToolSettings>().enabledToolNames()) {
+                "tools/list returned an unexpected tool catalog"
+            }
+            null
+        }.getOrElse { error ->
+            "MCP endpoint self-test failed: ${error.message ?: error.javaClass.simpleName}"
         }
-        val tools = send(
-            client,
-            uri,
-            token,
-            """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""",
-            includeProtocolVersion = true,
-        )
-        require(tools.statusCode() == 200) { "tools/list returned HTTP ${tools.statusCode()}" }
-        val names = JsonParser.parseString(tools.body()).asJsonObject
-            .getAsJsonObject("result")
-            .getAsJsonArray("tools")
-            .map { it.asJsonObject.get("name").asString }
-        require(names == project.service<McpToolSettings>().enabledToolNames()) {
-            "tools/list returned an unexpected tool catalog"
+        val elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000
+        if (failure == null) {
+            log.success("Endpoint 自检", "自检通过，耗时 ${elapsedMillis}ms")
+        } else {
+            log.error("Endpoint 自检", "$failure，耗时 ${elapsedMillis}ms")
         }
-        null
-    }.getOrElse { error -> "MCP endpoint self-test failed: ${error.message ?: error.javaClass.simpleName}" }
+        return failure
+    }
 
     private fun send(
         client: HttpClient,

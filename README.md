@@ -137,6 +137,8 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 
 `Coding Agent` 页的按钮区会持续显示“处理中”“成功”“失败”或提示状态；后台操作执行时会暂时禁用按钮，避免重复提交。设置页还支持自动检测、移除本插件节点、打开配置文件、复制 URL/Header/`tools/list` 命令、测试 endpoint 和轮换项目 Token。普通状态与预览不显示完整 Token；明确点击复制配置或 Header 时，剪贴板内容会包含 Token，请勿提交 Git 或粘贴到日志。
 
+IDE 底部的 `MCP Toolbox` 工具窗口集中显示插件日志，包括 Settings 操作、Endpoint 自检、Agent 同步和 MCP 请求的结果与耗时。窗口最多保留当前项目本次 IDE 会话最近 2000 条日志，支持清空和复制；请求参数不会写入日志，Token、Authorization、URL user-info 和 token query 参数会在记录前脱敏。
+
 ### 自动配置
 
 | Agent | 项目配置 | 插件节点 | 重载提示 |
