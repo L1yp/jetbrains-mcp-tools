@@ -48,7 +48,7 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools/message?sessionId=<session-i
 
 旧客户端向该地址 POST JSON-RPC 消息，服务端返回 `202 Accepted`，并通过原 SSE 连接的 `message` 事件发送 JSON-RPC response。SSE GET 与消息 POST 都必须携带同一个项目 Bearer Token；`sessionId` 只关联连接和项目，不替代认证。连接每 15 秒发送注释 heartbeat，并在底层 channel 关闭后立即清理。为兼容会先 POST 探测、失败后对同一 URL 发 GET 的客户端，主 endpoint 的无版本 GET 也提供相同 fallback。
 
-服务端实现 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call` 和 `notifications/cancelled`，不支持 batch、Resources、Prompts、Sampling、Tasks、Streamable HTTP 独立 SSE 流或事件重放。版本相关响应会按协商结果裁剪：`2024-11-05` 不返回 tool `annotations`，`2025-03-26` 及更早版本不返回 `outputSchema` / `structuredContent`。
+服务端实现 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call` 和 `notifications/cancelled`，不支持 batch、Resources、Prompts、Sampling、Tasks、Streamable HTTP 独立 SSE 流或事件重放。`tools/list` 接受标准 `cursor`、`_meta` 和未来扩展参数，但当前工具目录始终一次性完整返回，不产生 `nextCursor`。版本相关响应会按协商结果裁剪：`2024-11-05` 不返回 tool `annotations`，`2025-03-26` 及更早版本不返回 `outputSchema` / `structuredContent`。
 
 ## 工具
 

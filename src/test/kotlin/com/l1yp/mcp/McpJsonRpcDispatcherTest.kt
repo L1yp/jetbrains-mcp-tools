@@ -186,6 +186,26 @@ class McpJsonRpcDispatcherTest {
     }
 
     @Test
+    fun `tools list accepts pagination metadata and future parameters`() {
+        listOf(
+            """{"cursor":null}""",
+            """{"cursor":"opaque-cursor"}""",
+            """{"_meta":{"progressToken":"discovery"}}""",
+            """{"futureParameter":true}""",
+        ).forEach { params ->
+            val result = dispatcher.dispatch(
+                request(1, "tools/list", params),
+                McpProtocol.STREAMABLE_HTTP_2025_06_18,
+                null,
+            )
+
+            assertEquals(200, result.httpStatus)
+            assertTrue(result.payload().getAsJsonObject("result").has("tools"))
+            assertFalse(result.payload().getAsJsonObject("result").has("nextCursor"))
+        }
+    }
+
+    @Test
     fun `lists all tools with complete contracts`() {
         val result = dispatcher.dispatch(request(7, "tools/list"), McpProtocol.VERSION, null)
 
@@ -213,7 +233,7 @@ class McpJsonRpcDispatcherTest {
     fun `returns method not found and invalid params as JSON-RPC errors`() {
         val unknown = dispatcher.dispatch(request(1, "resources/list"), McpProtocol.VERSION, null)
         val invalid = dispatcher.dispatch(
-            request(1, "tools/list", """{"unexpected":true}"""),
+            request(1, "tools/call", """{"name":"example","unexpected":true}"""),
             McpProtocol.VERSION,
             null,
         )

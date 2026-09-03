@@ -104,7 +104,7 @@ internal class McpJsonRpcDispatcher(
             when (method) {
                 "initialize" -> initialize(id, params, protocolVersionHeader, transport)
                 "ping" -> success(id, JsonObject())
-                "tools/list" -> listTools(id, params, project, requireNotNull(effectiveProtocolVersion))
+                "tools/list" -> listTools(id, project, requireNotNull(effectiveProtocolVersion))
                 "tools/call" -> callTool(id, params, project, requireNotNull(effectiveProtocolVersion))
                 else -> protocolError(200, id, JsonRpcErrorCode.METHOD_NOT_FOUND, "Method not found: $method")
             }
@@ -165,13 +165,9 @@ internal class McpJsonRpcDispatcher(
 
     private fun listTools(
         id: JsonElement,
-        params: JsonObject,
         project: Project?,
         protocolVersion: String,
     ): McpDispatchResult {
-        if (params.size() != 0) {
-            return protocolError(200, id, JsonRpcErrorCode.INVALID_PARAMS, "tools/list does not accept params")
-        }
         val tools = JsonArray()
         val enabledNames = enabledToolNames(project)
         toolRegistry.definitions.filter { it.name in enabledNames }.forEach { definition ->
