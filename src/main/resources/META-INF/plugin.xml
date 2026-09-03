@@ -1,0 +1,37 @@
+<idea-plugin url="https://github.com/L1yp/jetbrains-mcp-tools">
+    <id>com.l1yp.mcpTools</id>
+    <name>MCP Toolbox</name>
+    <vendor url="https://github.com/L1yp">L1yp</vendor>
+
+    <description><![CDATA[
+        Provides secure, project-aware MCP tools for JetBrains IDE automation through
+        a self-contained MCP 2025-11-25 Streamable HTTP endpoint. The initial tool set
+        discovers, starts, and restarts IntelliJ IDEA Run Configurations.
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>0.4.0</h3>
+        <ul>
+            <li>Provides an independent MCP 2025-11-25 Streamable HTTP server.</li>
+            <li>Adds project-token security and Run Configuration exposure controls.</li>
+            <li>Supports automatic project configuration for eight coding agents.</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <httpRequestHandler implementation="com.l1yp.mcp.McpStreamableHttpService"/>
+        <fileEditorProvider implementation="com.l1yp.ui.McpGuideEditorProvider"/>
+        <postStartupActivity implementation="com.l1yp.execution.RunStateTrackerStartupActivity"/>
+        <postStartupActivity implementation="com.l1yp.mcp.McpProjectTokenStartupActivity"/>
+        <postStartupActivity implementation="com.l1yp.agentconfig.AgentConfigStartupActivity"/>
+        <postStartupActivity implementation="com.l1yp.ui.McpOnboardingActivity"/>
+        <projectConfigurable
+                parentId="tools"
+                id="com.l1yp.mcpTools.settings"
+                displayName="MCP Toolbox"
+                instance="com.l1yp.ui.McpSettingsConfigurable"
+                nonDefaultProject="true"/>
+    </extensions>
+</idea-plugin>
