@@ -92,7 +92,6 @@ internal object GitToolSupport {
         val detail = when {
             result.isAuthenticationFailed ->
                 "IDE-managed Git authentication failed or was cancelled; verify the saved credential or SSH key passphrase in IDEA"
-            result.cancelled() -> "the Git command was cancelled or timed out"
             else -> messages(result).firstOrNull() ?: "Git exited with code ${result.exitCode}"
         }
         return McpToolCallResult.error("$operation failed: $detail")
