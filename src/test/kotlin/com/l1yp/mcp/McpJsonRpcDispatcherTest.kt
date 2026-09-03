@@ -11,7 +11,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class McpJsonRpcDispatcherTest {
-    private val dispatcher = McpJsonRpcDispatcher(serverVersion = "9.8.7")
+    private val dispatcher = McpJsonRpcDispatcher(
+        serverVersion = "9.8.7",
+        enabledToolNames = { ToolRegistry.DEFAULT.names },
+    )
 
     @Test
     fun `negotiates only the 2025-11-25 protocol`() {
@@ -165,7 +168,11 @@ class McpJsonRpcDispatcherTest {
     fun `tool calls return text and structured content`() {
         val output = JsonObject().apply { addProperty("value", "ok") }
         val tool = fakeTool("example") { McpToolCallResult.success(output) }
-        val callDispatcher = McpJsonRpcDispatcher("1", ToolRegistry(listOf(tool)))
+        val callDispatcher = McpJsonRpcDispatcher(
+            "1",
+            ToolRegistry(listOf(tool)),
+            enabledToolNames = { setOf("example") },
+        )
 
         val result = callDispatcher.dispatch(
             request(9, "tools/call", """{"name":"example","arguments":{}}"""),
@@ -185,7 +192,11 @@ class McpJsonRpcDispatcherTest {
     @Test
     fun `tool business failures use isError instead of protocol errors`() {
         val tool = fakeTool("example") { McpToolCallResult.error("configuration was not found") }
-        val callDispatcher = McpJsonRpcDispatcher("1", ToolRegistry(listOf(tool)))
+        val callDispatcher = McpJsonRpcDispatcher(
+            "1",
+            ToolRegistry(listOf(tool)),
+            enabledToolNames = { setOf("example") },
+        )
 
         val result = callDispatcher.dispatch(
             request(9, "tools/call", """{"name":"example","arguments":{}}"""),
@@ -211,6 +222,36 @@ class McpJsonRpcDispatcherTest {
         )
 
         assertEquals(JsonRpcErrorCode.INVALID_PARAMS, result.errorCode())
+    }
+
+    @Test
+    fun `hides disabled tools and rejects their calls`() {
+        val enabledTool = fakeTool("enabled") { McpToolCallResult.success(JsonObject()) }
+        val disabledTool = fakeTool("disabled") { McpToolCallResult.success(JsonObject()) }
+        val restrictedDispatcher = McpJsonRpcDispatcher(
+            "1",
+            ToolRegistry(listOf(enabledTool, disabledTool)),
+            enabledToolNames = { setOf("enabled") },
+        )
+
+        val listed = restrictedDispatcher.dispatch(
+            request(1, "tools/list"),
+            McpProtocol.VERSION,
+            fakeProject(),
+        )
+        val called = restrictedDispatcher.dispatch(
+            request(2, "tools/call", """{"name":"disabled","arguments":{}}"""),
+            McpProtocol.VERSION,
+            fakeProject(),
+        )
+
+        assertEquals(
+            listOf("enabled"),
+            listed.payload().getAsJsonObject("result").getAsJsonArray("tools")
+                .map { it.asJsonObject.get("name").asString },
+        )
+        assertEquals(JsonRpcErrorCode.INVALID_PARAMS, called.errorCode())
+        assertTrue(called.payload().getAsJsonObject("error").get("message").asString.contains("disabled"))
     }
 
     private fun request(id: Any, method: String, params: String? = null): String {

@@ -90,7 +90,7 @@ internal class McpStatusPanel(
         processIdentity.text = "PID ${snapshot.processId}"
         projectIdentity.text = "${snapshot.projectName} · ${snapshot.projectPath.orEmpty()}"
         pluginVersion.text = snapshot.pluginVersion
-        toolsStatus.text = "${snapshot.toolCount} 个"
+        toolsStatus.text = "${snapshot.toolCount} / ${snapshot.supportedToolCount} 个已启用"
         codexArea.text = snapshot.codexConfiguration
         httpArea.text = snapshot.httpDetails
         toolsArea.text = snapshot.toolDefinitions

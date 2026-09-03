@@ -57,6 +57,8 @@ internal class ToolRegistry(
 
     val definitions: List<McpToolDefinition> = tools.map(McpTool::definition)
 
+    val names: Set<String> = toolsByName.keys
+
     fun find(name: String): McpTool? = toolsByName[name]
 
     companion object {

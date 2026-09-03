@@ -1,5 +1,6 @@
 package com.l1yp.ui
 
+import com.l1yp.mcp.ToolRegistry
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -23,5 +24,19 @@ class McpConfigurationFormatterTest {
         assertTrue(configuration.contains("git_push"))
         assertFalse(configuration.contains("command = \"node\""))
         assertFalse(configuration.contains("C:/Users/"))
+    }
+
+    @Test
+    fun `generates an allowlist from enabled tool definitions`() {
+        val enabledDefinition = ToolRegistry.DEFAULT.definitions.single { it.name == "git_fetch" }
+
+        val configuration = McpConfigurationFormatter.codexConfiguration(
+            "Order Service",
+            "http://127.0.0.1:63342/api/jetbrains-mcp-tools",
+            listOf(enabledDefinition),
+        )
+
+        assertTrue(configuration.contains("enabled_tools = [\"git_fetch\"]"))
+        assertFalse(configuration.contains("restart_run_configuration"))
     }
 }

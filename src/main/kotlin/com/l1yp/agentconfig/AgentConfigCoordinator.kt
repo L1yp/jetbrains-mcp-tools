@@ -19,6 +19,7 @@ import com.l1yp.agentconfig.adapters.ZCodeConfigAdapter
 import com.l1yp.agentconfig.adapters.ManualAgentCatalog
 import com.l1yp.mcp.McpProjectTokenService
 import com.l1yp.mcp.McpProtocol
+import com.l1yp.mcp.McpToolSettings
 import com.l1yp.mcp.ToolRegistry
 import org.jetbrains.ide.BuiltInServerManager
 import java.net.URI
@@ -204,7 +205,7 @@ internal class AgentConfigCoordinator(private val project: Project) : Disposable
             protocolVersion = McpProtocol.VERSION,
             startupTimeoutMillis = 10_000,
             toolTimeoutMillis = 120_000,
-            enabledTools = ToolRegistry.DEFAULT.definitions.map { it.name },
+            enabledTools = project.service<McpToolSettings>().enabledToolNames(),
         )
     }
 
@@ -309,7 +310,7 @@ internal object McpEndpointSelfTest {
             .getAsJsonObject("result")
             .getAsJsonArray("tools")
             .map { it.asJsonObject.get("name").asString }
-        require(names == ToolRegistry.DEFAULT.definitions.map { it.name }) {
+        require(names == project.service<McpToolSettings>().enabledToolNames()) {
             "tools/list returned an unexpected tool catalog"
         }
         null

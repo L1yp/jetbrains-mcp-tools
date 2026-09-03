@@ -132,9 +132,10 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 1. 在 `Coding Agent` 页勾选当前项目实际使用的 Agent。
 2. 点击“预览变更”检查脱敏 diff。
 3. 点击“同步选中 Agent”，插件会先执行本地 `initialize → tools/list` 自检，再合并配置。
-4. 在“可重启的 Run Configuration”页选择允许公开的类型。首次使用默认隐藏 Maven 和 Gradle，临时配置始终不公开。
+4. 在 `MCP 工具` 页查看完整工具列表，按项目启用或禁用工具。禁用项不会出现在 `tools/list` 中，也不能通过 `tools/call` 调用。
+5. 在“可重启的 Run Configuration”页选择允许公开的类型。首次使用默认隐藏 Maven 和 Gradle，临时配置始终不公开。
 
-设置页还支持自动检测、移除本插件节点、打开配置文件、复制 URL/Header/`tools/list` 命令、测试 endpoint 和轮换项目 Token。普通状态与预览不显示完整 Token；明确点击复制配置或 Header 时，剪贴板内容会包含 Token，请勿提交 Git 或粘贴到日志。
+`Coding Agent` 页的按钮区会持续显示“处理中”“成功”“失败”或提示状态；后台操作执行时会暂时禁用按钮，避免重复提交。设置页还支持自动检测、移除本插件节点、打开配置文件、复制 URL/Header/`tools/list` 命令、测试 endpoint 和轮换项目 Token。普通状态与预览不显示完整 Token；明确点击复制配置或 Header 时，剪贴板内容会包含 Token，请勿提交 Git 或粘贴到日志。
 
 ### 自动配置
 

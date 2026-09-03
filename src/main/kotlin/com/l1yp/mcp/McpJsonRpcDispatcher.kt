@@ -6,11 +6,15 @@ import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 
 internal class McpJsonRpcDispatcher(
     private val serverVersion: String,
     private val toolRegistry: ToolRegistry = ToolRegistry.DEFAULT,
+    private val enabledToolNames: (Project?) -> Set<String> = { project ->
+        project?.service<McpToolSettings>()?.enabledToolNames(toolRegistry)?.toSet() ?: toolRegistry.names
+    },
 ) {
     fun dispatch(
         requestBody: String,
@@ -92,7 +96,7 @@ internal class McpJsonRpcDispatcher(
             when (method) {
                 "initialize" -> initialize(id, params)
                 "ping" -> success(id, JsonObject())
-                "tools/list" -> listTools(id, params)
+                "tools/list" -> listTools(id, params, project)
                 "tools/call" -> callTool(id, params, project)
                 else -> protocolError(200, id, JsonRpcErrorCode.METHOD_NOT_FOUND, "Method not found: $method")
             }
@@ -133,12 +137,13 @@ internal class McpJsonRpcDispatcher(
         })
     }
 
-    private fun listTools(id: JsonElement, params: JsonObject): McpDispatchResult {
+    private fun listTools(id: JsonElement, params: JsonObject, project: Project?): McpDispatchResult {
         if (params.size() != 0) {
             return protocolError(200, id, JsonRpcErrorCode.INVALID_PARAMS, "tools/list does not accept params")
         }
         val tools = JsonArray()
-        toolRegistry.definitions.forEach { definition ->
+        val enabledNames = enabledToolNames(project)
+        toolRegistry.definitions.filter { it.name in enabledNames }.forEach { definition ->
             tools.add(JsonObject().apply {
                 addProperty("name", definition.name)
                 addProperty("description", definition.description)
@@ -166,6 +171,14 @@ internal class McpJsonRpcDispatcher(
             ?: return protocolError(200, id, JsonRpcErrorCode.INVALID_PARAMS, "Unknown tool '$name'")
         val targetProject = project
             ?: return protocolError(500, id, JsonRpcErrorCode.INTERNAL_ERROR, "Project context is unavailable")
+        if (name !in enabledToolNames(targetProject)) {
+            return protocolError(
+                200,
+                id,
+                JsonRpcErrorCode.INVALID_PARAMS,
+                "Tool '$name' is disabled in MCP Toolbox settings",
+            )
+        }
         val callResult = tool.call(targetProject, arguments)
         val result = JsonObject().apply {
             add("content", JsonArray().apply {
