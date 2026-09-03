@@ -3,6 +3,7 @@ package com.l1yp.mcp
 import com.google.gson.JsonObject
 import com.intellij.openapi.project.Project
 import com.l1yp.tool.GetGitRepositoriesTool
+import com.l1yp.tool.GetGitRemotesTool
 import com.l1yp.tool.GetRestartableRunConfigurationsTool
 import com.l1yp.tool.GitFetchTool
 import com.l1yp.tool.GitPullTool
@@ -46,6 +47,7 @@ internal class ToolRegistry(
         GetRestartableRunConfigurationsTool(),
         RestartRunConfigurationTool(),
         GetGitRepositoriesTool(),
+        GetGitRemotesTool(),
         GitFetchTool(),
         GitPullTool(),
         GitPushTool(),

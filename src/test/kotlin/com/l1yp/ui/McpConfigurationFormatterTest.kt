@@ -17,6 +17,7 @@ class McpConfigurationFormatterTest {
         assertTrue(configuration.contains("Authorization = \"Bearer <project-token>\""))
         assertTrue(configuration.contains("restart_run_configuration"))
         assertTrue(configuration.contains("get_git_repositories"))
+        assertTrue(configuration.contains("get_git_remotes"))
         assertTrue(configuration.contains("git_fetch"))
         assertTrue(configuration.contains("git_pull"))
         assertTrue(configuration.contains("git_push"))

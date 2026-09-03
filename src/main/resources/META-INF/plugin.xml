@@ -12,7 +12,7 @@
     <change-notes><![CDATA[
         <h3>0.5.0</h3>
         <ul>
-            <li>Adds project-bound Git repository discovery, fetch, fast-forward/rebase/merge pull, and non-force push tools.</li>
+            <li>Adds project-bound Git repository and remote discovery, fetch, fast-forward/rebase/merge pull, and non-force push tools.</li>
             <li>Routes Git authentication through the IDE credential and SSH askpass integration.</li>
         </ul>
         <h3>0.4.0</h3>

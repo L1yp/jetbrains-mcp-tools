@@ -158,11 +158,18 @@ internal object GitToolSupport {
             .take(MAX_OUTPUT_LINES)
             .toList()
 
-    fun redactCredentials(value: String): String = URL_USER_INFO.replace(value, "$1***@")
+    fun redactCredentials(value: String): String = SENSITIVE_QUERY_VALUE.replace(
+        URL_USER_INFO.replace(value, "$1***@"),
+        "$1***",
+    )
 
     private fun normalizeRoot(value: String): String = value.replace('\\', '/').trimEnd('/')
 
     private val URL_USER_INFO = Regex("([A-Za-z][A-Za-z0-9+.-]*://)[^/@\\s]+@")
+    private val SENSITIVE_QUERY_VALUE = Regex(
+        "([?&](?:access_token|private_token|oauth_token|token|password)=)[^&#\\s]+",
+        RegexOption.IGNORE_CASE,
+    )
 }
 
 internal class GitToolFailure(message: String) : RuntimeException(message)

@@ -133,6 +133,7 @@ class McpJsonRpcDispatcherTest {
                 "get_restartable_run_configurations",
                 "restart_run_configuration",
                 "get_git_repositories",
+                "get_git_remotes",
                 "git_fetch",
                 "git_pull",
                 "git_push",

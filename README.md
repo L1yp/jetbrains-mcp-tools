@@ -78,6 +78,16 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 
 输入为 `{}`。返回 IDEA 当前管理的 Git 仓库根路径、状态、HEAD、当前分支、上游分支和 remote 名称。后续 Git 工具的 `repositoryRoot` 必须使用这里返回的精确值；单仓库项目可以省略，多仓库项目必须显式指定。
 
+### `get_git_remotes`
+
+返回一个 IDEA 管理仓库的 remote 名称及 fetch/push URL，效果类似只读的 `git remote -v`。未单独配置 push URL 时返回有效的 fetch URL；URL user-info 以及 `access_token`、`private_token`、`oauth_token`、`token`、`password` 查询参数会被替换为 `***`。
+
+```json
+{
+  "repositoryRoot": "E:/workspace/order-service"
+}
+```
+
 ### `git_fetch`
 
 从已配置的 remote 获取引用。`remote` 省略时依次选择当前分支的上游 remote、`origin` 或唯一 remote；`prune` 默认 `false`。工具不接收任意 URL 或凭据。

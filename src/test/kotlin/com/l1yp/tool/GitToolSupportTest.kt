@@ -26,4 +26,16 @@ class GitToolSupportTest {
         )
         assertFalse(content.toString().contains("secret"))
     }
+
+    @Test
+    fun `remote URL redaction hides sensitive query values`() {
+        val redacted = GitToolSupport.redactCredentials(
+            "https://example.com/repository.git?access_token=secret&mode=mirror",
+        )
+
+        assertEquals(
+            "https://example.com/repository.git?access_token=***&mode=mirror",
+            redacted,
+        )
+    }
 }

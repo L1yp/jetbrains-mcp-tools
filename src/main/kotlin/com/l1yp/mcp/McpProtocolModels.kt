@@ -6,8 +6,8 @@ internal object McpProtocol {
     const val SERVER_NAME = "jetbrains-mcp-tools"
     const val INSTRUCTIONS =
         "Call get_restartable_run_configurations before restart_run_configuration, and get_git_repositories before " +
-            "git_fetch, git_pull, or git_push. Use exact returned names and repository roots. Git remote tools use " +
-            "IDE-managed authentication; never request or expose credentials."
+            "get_git_remotes, git_fetch, git_pull, or git_push. Use exact returned names and repository roots. Git " +
+            "remote tools use IDE-managed authentication; never request or expose credentials."
 }
 
 internal data class McpDispatchResult(
