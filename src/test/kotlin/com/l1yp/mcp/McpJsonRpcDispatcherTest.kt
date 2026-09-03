@@ -17,7 +17,7 @@ class McpJsonRpcDispatcherTest {
     )
 
     @Test
-    fun `negotiates only the 2025-11-25 protocol`() {
+    fun `negotiates the latest protocol`() {
         val result = dispatcher.dispatch(
             requestBody = request(1, "initialize", """{"protocolVersion":"2025-11-25"}"""),
             protocolVersionHeader = null,
@@ -36,6 +36,42 @@ class McpJsonRpcDispatcherTest {
                 .get("listChanged")
                 .asBoolean,
         )
+        assertEquals("2025-11-25", result.negotiatedProtocolVersion)
+    }
+
+    @Test
+    fun `negotiates all supported streamable HTTP versions`() {
+        listOf("2025-11-25", "2025-06-18", "2025-03-26").forEach { version ->
+            val result = dispatcher.dispatch(
+                requestBody = request(1, "initialize", """{"protocolVersion":"$version"}"""),
+                protocolVersionHeader = null,
+                project = null,
+            )
+
+            assertEquals(200, result.httpStatus)
+            assertEquals(version, result.payload().getAsJsonObject("result").get("protocolVersion").asString)
+            assertEquals(version, result.negotiatedProtocolVersion)
+        }
+    }
+
+    @Test
+    fun `negotiates 2024-11-05 only on legacy HTTP SSE`() {
+        val legacy = dispatcher.dispatch(
+            requestBody = request(1, "initialize", """{"protocolVersion":"2024-11-05"}"""),
+            protocolVersionHeader = null,
+            project = null,
+            transport = McpTransport.LEGACY_HTTP_SSE,
+        )
+        val wrongTransport = dispatcher.dispatch(
+            requestBody = request(1, "initialize", """{"protocolVersion":"2024-11-05"}"""),
+            protocolVersionHeader = null,
+            project = null,
+        )
+
+        assertEquals(200, legacy.httpStatus)
+        assertEquals("2024-11-05", legacy.negotiatedProtocolVersion)
+        assertFalse(legacy.payload().getAsJsonObject("result").has("instructions"))
+        assertEquals(400, wrongTransport.httpStatus)
     }
 
     @Test
@@ -52,14 +88,15 @@ class McpJsonRpcDispatcherTest {
     }
 
     @Test
-    fun `requires protocol header after initialization`() {
+    fun `accepts supported protocol headers and defaults missing headers to 2025-03-26`() {
         val missing = dispatcher.dispatch(request(1, "ping"), null, null)
         val wrong = dispatcher.dispatch(request(1, "ping"), "2024-11-05", null)
         val valid = dispatcher.dispatch(request(1, "ping"), McpProtocol.VERSION, null)
 
-        assertEquals(400, missing.httpStatus)
+        assertEquals(200, missing.httpStatus)
         assertEquals(400, wrong.httpStatus)
         assertEquals(200, valid.httpStatus)
+        assertEquals(JsonObject(), missing.payload().getAsJsonObject("result"))
         assertEquals(JsonObject(), valid.payload().getAsJsonObject("result"))
     }
 
@@ -115,15 +152,37 @@ class McpJsonRpcDispatcherTest {
     }
 
     @Test
-    fun `notifications still require the negotiated protocol header`() {
+    fun `notifications without a protocol header use the 2025-03-26 fallback`() {
         val missingHeader = dispatcher.dispatch(
             """{"jsonrpc":"2.0","method":"notifications/initialized"}""",
             null,
             null,
         )
 
-        assertEquals(400, missingHeader.httpStatus)
-        assertEquals(JsonRpcErrorCode.INVALID_REQUEST, missingHeader.errorCode())
+        assertEquals(202, missingHeader.httpStatus)
+        assertNull(missingHeader.responseBody)
+    }
+
+    @Test
+    fun `tailors tool contracts to the negotiated protocol`() {
+        val march2025 = dispatcher.dispatch(
+            request(1, "tools/list"),
+            McpProtocol.STREAMABLE_HTTP_2025_03_26,
+            null,
+        )
+        val legacy = dispatcher.dispatch(
+            request(1, "tools/list"),
+            McpProtocol.LEGACY_HTTP_SSE_2024_11_05,
+            null,
+            McpTransport.LEGACY_HTTP_SSE,
+        )
+
+        val marchTool = march2025.payload().getAsJsonObject("result").getAsJsonArray("tools").first().asJsonObject
+        assertTrue(marchTool.has("annotations"))
+        assertFalse(marchTool.has("outputSchema"))
+        val legacyTool = legacy.payload().getAsJsonObject("result").getAsJsonArray("tools").first().asJsonObject
+        assertFalse(legacyTool.has("annotations"))
+        assertFalse(legacyTool.has("outputSchema"))
     }
 
     @Test
@@ -187,6 +246,27 @@ class McpJsonRpcDispatcherTest {
             output.toString(),
             callResult.getAsJsonArray("content").first().asJsonObject.get("text").asString,
         )
+    }
+
+    @Test
+    fun `legacy tool calls omit structured content but preserve text`() {
+        val output = JsonObject().apply { addProperty("value", "ok") }
+        val legacyDispatcher = McpJsonRpcDispatcher(
+            "1",
+            ToolRegistry(listOf(fakeTool("example") { McpToolCallResult.success(output) })),
+            enabledToolNames = { setOf("example") },
+        )
+
+        val result = legacyDispatcher.dispatch(
+            request(9, "tools/call", """{"name":"example","arguments":{}}"""),
+            McpProtocol.LEGACY_HTTP_SSE_2024_11_05,
+            fakeProject(),
+            McpTransport.LEGACY_HTTP_SSE,
+        )
+
+        val callResult = result.payload().getAsJsonObject("result")
+        assertFalse(callResult.has("structuredContent"))
+        assertEquals(output.toString(), callResult.getAsJsonArray("content").first().asJsonObject.get("text").asString)
     }
 
     @Test

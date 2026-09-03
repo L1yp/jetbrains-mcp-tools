@@ -40,4 +40,15 @@ class McpConfigurationFormatterTest {
         assertTrue(configuration.contains("enabled_tools = [\"git_fetch\"]"))
         assertFalse(configuration.contains("restart_run_configuration"))
     }
+
+    @Test
+    fun `shows the protocol compatibility matrix and legacy SSE endpoint`() {
+        val details = McpConfigurationFormatter.httpDetails(
+            "http://127.0.0.1:63342/api/jetbrains-mcp-tools",
+        )
+
+        assertTrue(details.contains("2025-11-25, 2025-06-18, 2025-03-26"))
+        assertTrue(details.contains("/api/jetbrains-mcp-tools/sse"))
+        assertTrue(details.contains("2024-11-05"))
+    }
 }

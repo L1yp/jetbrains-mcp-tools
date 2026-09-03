@@ -1,5 +1,7 @@
 # MCP Toolbox 独立化与多 Agent 自动配置重构计划
 
+> 历史设计文档：初版以仅支持 MCP `2025-11-25` 为范围。当前实现已在同一 JetBrains Built-in Web Server 上增加 `2025-06-18` / `2025-03-26` Streamable HTTP 协商，以及 `2024-11-05` HTTP+SSE 兼容 endpoint；现行行为以 README 和代码为准。
+
 ## 1. 文档状态
 
 - 状态：待实施

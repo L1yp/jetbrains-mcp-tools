@@ -72,6 +72,37 @@ class McpHttpSecurityTest {
     }
 
     @Test
+    fun `uses transport specific media requirements for legacy SSE`() {
+        assertIs<McpHttpSecurityResult.Authorized>(
+            security.authorize(
+                validRequest().copy(
+                    contentType = null,
+                    accept = "text/event-stream",
+                    exchange = McpHttpExchange.LEGACY_SSE_GET,
+                ),
+            ),
+        )
+        assertEquals(
+            400,
+            rejected(
+                validRequest().copy(
+                    contentType = null,
+                    accept = "application/json",
+                    exchange = McpHttpExchange.LEGACY_SSE_GET,
+                ),
+            ).httpStatus,
+        )
+        assertIs<McpHttpSecurityResult.Authorized>(
+            security.authorize(
+                validRequest().copy(
+                    accept = null,
+                    exchange = McpHttpExchange.LEGACY_SSE_POST,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `rate limits repeated authentication failures and clears on success`() {
         repeat(8) {
             assertEquals(401, rejected(validRequest().copy(authorization = "Bearer wrong-$it")).httpStatus)

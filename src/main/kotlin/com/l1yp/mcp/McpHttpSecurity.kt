@@ -14,7 +14,14 @@ internal data class McpHttpSecurityRequest(
     val contentType: String?,
     val accept: String?,
     val actualPort: Int,
+    val exchange: McpHttpExchange = McpHttpExchange.STREAMABLE_POST,
 )
+
+internal enum class McpHttpExchange {
+    STREAMABLE_POST,
+    LEGACY_SSE_GET,
+    LEGACY_SSE_POST,
+}
 
 internal sealed interface McpHttpSecurityResult {
     data class Authorized(val project: Project) : McpHttpSecurityResult
@@ -37,14 +44,28 @@ internal class McpHttpSecurity(
         if (!isExpectedHost(request.host, request.actualPort)) {
             return McpHttpSecurityResult.Rejected(403, "Host must match the loopback server endpoint")
         }
-        if (!isJsonContentType(request.contentType)) {
-            return McpHttpSecurityResult.Rejected(400, "Content-Type must be application/json")
-        }
-        if (!acceptsRequiredMediaTypes(request.accept)) {
-            return McpHttpSecurityResult.Rejected(
-                400,
-                "Accept must include application/json and text/event-stream",
-            )
+        when (request.exchange) {
+            McpHttpExchange.STREAMABLE_POST -> {
+                if (!isJsonContentType(request.contentType)) {
+                    return McpHttpSecurityResult.Rejected(400, "Content-Type must be application/json")
+                }
+                if (!acceptsAll(request.accept, JSON_MEDIA_TYPE, SSE_MEDIA_TYPE)) {
+                    return McpHttpSecurityResult.Rejected(
+                        400,
+                        "Accept must include application/json and text/event-stream",
+                    )
+                }
+            }
+            McpHttpExchange.LEGACY_SSE_GET -> {
+                if (!acceptsAll(request.accept, SSE_MEDIA_TYPE)) {
+                    return McpHttpSecurityResult.Rejected(400, "Accept must include text/event-stream")
+                }
+            }
+            McpHttpExchange.LEGACY_SSE_POST -> {
+                if (!isJsonContentType(request.contentType)) {
+                    return McpHttpSecurityResult.Rejected(400, "Content-Type must be application/json")
+                }
+            }
         }
 
         val rateLimitKey = remoteAddress.hostAddress
@@ -107,17 +128,19 @@ internal class McpHttpSecurity(
         return mediaType == "application/json" || (mediaType.startsWith("application/") && mediaType.endsWith("+json"))
     }
 
-    private fun acceptsRequiredMediaTypes(accept: String?): Boolean {
+    private fun acceptsAll(accept: String?, vararg requiredMediaTypes: String): Boolean {
         val mediaTypes = accept
             ?.split(',')
             ?.map { it.substringBefore(';').trim().lowercase() }
             ?.toSet()
             ?: return false
-        return "application/json" in mediaTypes && "text/event-stream" in mediaTypes
+        return requiredMediaTypes.all { it in mediaTypes }
     }
 
     private companion object {
         const val BEARER_PREFIX = "Bearer "
+        const val JSON_MEDIA_TYPE = "application/json"
+        const val SSE_MEDIA_TYPE = "text/event-stream"
     }
 }
 

@@ -5,13 +5,15 @@
 
     <description><![CDATA[
         Provides secure, project-aware MCP tools for JetBrains IDE automation through
-        a self-contained MCP 2025-11-25 Streamable HTTP endpoint. The tool set manages
+        a self-contained MCP Streamable HTTP endpoint with protocol-version negotiation
+        and legacy HTTP+SSE compatibility. The tool set manages
         IntelliJ IDEA Run Configurations and authenticated Git remote operations.
     ]]></description>
 
     <change-notes><![CDATA[
         <h3>0.5.0</h3>
         <ul>
+            <li>Supports MCP 2025-11-25, 2025-06-18, and 2025-03-26 over Streamable HTTP, plus MCP 2024-11-05 over legacy HTTP+SSE.</li>
             <li>Adds project-bound Git repository and remote discovery, fetch, fast-forward/rebase/merge pull, and non-force push tools.</li>
             <li>Routes Git authentication through the IDE credential and SSH askpass integration.</li>
         </ul>

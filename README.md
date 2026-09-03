@@ -2,7 +2,7 @@
 
 ![MCP Toolbox 图标](src/main/resources/META-INF/pluginIcon.svg)
 
-MCP Toolbox 是一个面向 JetBrains IDE 自动化的可扩展 MCP 工具插件，通过 IDE Built-in Web Server 提供安全、项目感知的 MCP `2025-11-25` Streamable HTTP endpoint。工具可查询、启动或重启项目 Run Configuration，也可通过 IDEA 已保存的凭据执行 Git fetch、pull 和 push。
+MCP Toolbox 是一个面向 JetBrains IDE 自动化的可扩展 MCP 工具插件，通过 IDE Built-in Web Server 提供安全、项目感知的 MCP endpoint。服务端支持 MCP `2025-11-25`、`2025-06-18` 和 `2025-03-26` Streamable HTTP，并为 MCP `2024-11-05` 提供旧式 HTTP+SSE 兼容传输。工具可查询、启动或重启项目 Run Configuration，也可通过 IDEA 已保存的凭据执行 Git fetch、pull 和 push。
 
 计划发布仓库：[`L1yp/jetbrains-mcp-tools`](https://github.com/L1yp/jetbrains-mcp-tools)
 
@@ -16,23 +16,39 @@ MCP Toolbox 是一个面向 JetBrains IDE 自动化的可扩展 MCP 工具插件
 http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 ```
 
-传输层为无会话 Streamable HTTP，仅返回 JSON：
+主 endpoint 使用无会话 Streamable HTTP：
 
 | 请求 | 行为 |
 |---|---|
 | `POST` JSON-RPC request | 返回 `application/json` JSON-RPC response |
 | `POST` notification | 返回 `202 Accepted`，无响应体 |
-| `GET`、`DELETE` 或其他 method | 返回 `405 Method Not Allowed` |
+| 携带 `MCP-Protocol-Version` 的 `GET` | 返回 `405 Method Not Allowed`；服务端不提供 Streamable HTTP 独立消息流 |
+| 不携带 `MCP-Protocol-Version` 的 `GET` | 作为旧客户端探测的 HTTP+SSE fallback 建立兼容连接 |
+| `DELETE` 或其他 method | 返回 `405 Method Not Allowed` |
 
-客户端请求必须满足：
+Streamable HTTP 客户端请求必须满足：
 
 - `Content-Type` 为 `application/json` 或兼容的 `application/*+json`。
 - `Accept` 同时包含 `application/json` 和 `text/event-stream`。
-- 除 `initialize` 外携带 `MCP-Protocol-Version: 2025-11-25`。
+- MCP `2025-06-18` 及之后的客户端在 `initialize` 后携带协商出的 `MCP-Protocol-Version`；未携带该 header 时按规范兼容为 `2025-03-26`。
 - 携带设置页为当前项目生成的 `Authorization: Bearer <project-token>`。
 - 请求来自 loopback，且 `Origin`（若存在）和 `Host` 均指向 loopback endpoint。
 
-服务端实现 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call` 和 `notifications/cancelled`，不支持 batch、Resources、Prompts、Sampling、Tasks 或长期 SSE。
+MCP `2024-11-05` 客户端可以把以下地址配置为旧式 SSE endpoint：
+
+```text
+http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools/sse
+```
+
+服务端建立长连接后先发送 `endpoint` 事件，事件中的一次性消息地址形如：
+
+```text
+http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools/message?sessionId=<session-id>
+```
+
+旧客户端向该地址 POST JSON-RPC 消息，服务端返回 `202 Accepted`，并通过原 SSE 连接的 `message` 事件发送 JSON-RPC response。SSE GET 与消息 POST 都必须携带同一个项目 Bearer Token；`sessionId` 只关联连接和项目，不替代认证。连接每 15 秒发送注释 heartbeat，并在底层 channel 关闭后立即清理。为兼容会先 POST 探测、失败后对同一 URL 发 GET 的客户端，主 endpoint 的无版本 GET 也提供相同 fallback。
+
+服务端实现 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call` 和 `notifications/cancelled`，不支持 batch、Resources、Prompts、Sampling、Tasks、Streamable HTTP 独立 SSE 流或事件重放。版本相关响应会按协商结果裁剪：`2024-11-05` 不返回 tool `annotations`，`2025-03-26` 及更早版本不返回 `outputSchema` / `structuredContent`。
 
 ## 工具
 
@@ -72,7 +88,7 @@ http://127.0.0.1:<IDE_PORT>/api/jetbrains-mcp-tools
 - 当前 Execution Target 不支持该配置。
 - 同一配置存在多个并行运行实例。
 
-成功结果同时包含文本 `content` 和 `structuredContent`。
+MCP `2025-06-18` 及之后的成功结果同时包含文本 `content` 和 `structuredContent`；较早版本只返回兼容的文本 `content`。
 
 ### `get_git_repositories`
 
@@ -201,6 +217,7 @@ MiniMax Code、DeepSeek Harness、WorkBuddy 和 Pi 不会被自动写入。设�
 - `403`：请求不是 loopback，或 `Origin` / `Host` 与当前 endpoint 不匹配。
 - `400`：检查 `Content-Type`、`Accept`、`MCP-Protocol-Version` 和 JSON-RPC 格式。
 - `413`：请求体超过 1 MiB。
+- 旧式 SSE 消息 endpoint 返回 `404`：对应长连接已关闭或 `sessionId` 已失效，重新连接 SSE endpoint。
 - “配置被 Git 跟踪”：把动态配置迁移到该 Agent 的 local override；插件不会自动解除跟踪。
 - “配置被用户修改”：先预览差异，只在确认本插件节点应被替换时点击“覆盖当前节点”。
 - “被另一个 IDEA 实例占用”：关闭占用该项目的另一个 IDEA，等待租约接管后再同步。
@@ -233,6 +250,9 @@ Plugin Verifier 固定覆盖：
 
 - [MCP 2025-11-25 Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 - [MCP 2025-11-25 Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+- [MCP 2025-06-18 Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
+- [MCP 2025-03-26 Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports)
+- [MCP 2024-11-05 HTTP+SSE](https://modelcontextprotocol.io/specification/2024-11-05/basic/transports)
 - [Codex MCP](https://developers.openai.com/codex/mcp)
 - [Kimi Code MCP](https://moonshotai.github.io/kimi-code/en/customization/mcp.html)
 - [OpenCode V2 MCP](https://opencode.ai/v2/docs/mcp-servers)

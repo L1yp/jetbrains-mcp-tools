@@ -20,6 +20,7 @@ internal class McpJsonRpcDispatcher(
         requestBody: String,
         protocolVersionHeader: String?,
         project: Project?,
+        transport: McpTransport = McpTransport.STREAMABLE_HTTP,
     ): McpDispatchResult {
         val payload = try {
             JsonParser.parseString(requestBody)
@@ -65,17 +66,24 @@ internal class McpJsonRpcDispatcher(
             element.asJsonObject
         } ?: JsonObject()
 
-        if (method != "initialize" && protocolVersionHeader != McpProtocol.VERSION) {
+        val supportedVersions = McpProtocol.versionsFor(transport)
+        val effectiveProtocolVersion = when {
+            method == "initialize" -> null
+            protocolVersionHeader != null -> protocolVersionHeader
+            transport == McpTransport.STREAMABLE_HTTP -> McpProtocol.STREAMABLE_HTTP_2025_03_26
+            else -> null
+        }
+        if (method != "initialize" && effectiveProtocolVersion !in supportedVersions) {
             return protocolError(
                 400,
                 id,
                 JsonRpcErrorCode.INVALID_REQUEST,
-                "MCP-Protocol-Version must be ${McpProtocol.VERSION}",
+                "MCP-Protocol-Version must be one of ${supportedVersions.joinToString()}",
             )
         }
         if (method == "initialize" &&
             protocolVersionHeader != null &&
-            protocolVersionHeader != McpProtocol.VERSION
+            protocolVersionHeader !in supportedVersions
         ) {
             return protocolError(
                 400,
@@ -94,10 +102,10 @@ internal class McpJsonRpcDispatcher(
 
         return try {
             when (method) {
-                "initialize" -> initialize(id, params)
+                "initialize" -> initialize(id, params, protocolVersionHeader, transport)
                 "ping" -> success(id, JsonObject())
-                "tools/list" -> listTools(id, params, project)
-                "tools/call" -> callTool(id, params, project)
+                "tools/list" -> listTools(id, params, project, requireNotNull(effectiveProtocolVersion))
+                "tools/call" -> callTool(id, params, project, requireNotNull(effectiveProtocolVersion))
                 else -> protocolError(200, id, JsonRpcErrorCode.METHOD_NOT_FOUND, "Method not found: $method")
             }
         } catch (_: IllegalArgumentException) {
@@ -107,7 +115,12 @@ internal class McpJsonRpcDispatcher(
         }
     }
 
-    private fun initialize(id: JsonElement, params: JsonObject): McpDispatchResult {
+    private fun initialize(
+        id: JsonElement,
+        params: JsonObject,
+        protocolVersionHeader: String?,
+        transport: McpTransport,
+    ): McpDispatchResult {
         val requestedVersion = params.string("protocolVersion")
             ?: return protocolError(
                 400,
@@ -115,17 +128,28 @@ internal class McpJsonRpcDispatcher(
                 JsonRpcErrorCode.INVALID_PARAMS,
                 "protocolVersion is required",
             )
-        if (requestedVersion != McpProtocol.VERSION) {
+        val supportedVersions = McpProtocol.versionsFor(transport)
+        if (requestedVersion !in supportedVersions) {
             return protocolError(
                 400,
                 id,
                 JsonRpcErrorCode.INVALID_PARAMS,
-                "Unsupported protocolVersion '$requestedVersion'; only ${McpProtocol.VERSION} is supported",
+                "Unsupported protocolVersion '$requestedVersion' for ${transport.displayName}; " +
+                    "supported versions: ${supportedVersions.joinToString()}",
+            )
+        }
+        if (protocolVersionHeader != null && protocolVersionHeader != requestedVersion) {
+            return protocolError(
+                400,
+                id,
+                JsonRpcErrorCode.INVALID_PARAMS,
+                "MCP-Protocol-Version '$protocolVersionHeader' does not match initialize protocolVersion " +
+                    "'$requestedVersion'",
             )
         }
 
         return success(id, JsonObject().apply {
-            addProperty("protocolVersion", McpProtocol.VERSION)
+            addProperty("protocolVersion", requestedVersion)
             add("capabilities", JsonObject().apply {
                 add("tools", JsonObject().apply { addProperty("listChanged", false) })
             })
@@ -133,11 +157,18 @@ internal class McpJsonRpcDispatcher(
                 addProperty("name", McpProtocol.SERVER_NAME)
                 addProperty("version", serverVersion)
             })
-            addProperty("instructions", McpProtocol.INSTRUCTIONS)
-        })
+            if (McpProtocol.supportsServerInstructions(requestedVersion)) {
+                addProperty("instructions", McpProtocol.INSTRUCTIONS)
+            }
+        }).copy(negotiatedProtocolVersion = requestedVersion)
     }
 
-    private fun listTools(id: JsonElement, params: JsonObject, project: Project?): McpDispatchResult {
+    private fun listTools(
+        id: JsonElement,
+        params: JsonObject,
+        project: Project?,
+        protocolVersion: String,
+    ): McpDispatchResult {
         if (params.size() != 0) {
             return protocolError(200, id, JsonRpcErrorCode.INVALID_PARAMS, "tools/list does not accept params")
         }
@@ -148,14 +179,23 @@ internal class McpJsonRpcDispatcher(
                 addProperty("name", definition.name)
                 addProperty("description", definition.description)
                 add("inputSchema", definition.inputSchema.deepCopy())
-                add("outputSchema", definition.outputSchema.deepCopy())
-                add("annotations", definition.annotations.deepCopy())
+                if (McpProtocol.supportsStructuredToolContent(protocolVersion)) {
+                    add("outputSchema", definition.outputSchema.deepCopy())
+                }
+                if (McpProtocol.supportsToolAnnotations(protocolVersion)) {
+                    add("annotations", definition.annotations.deepCopy())
+                }
             })
         }
         return success(id, JsonObject().apply { add("tools", tools) })
     }
 
-    private fun callTool(id: JsonElement, params: JsonObject, project: Project?): McpDispatchResult {
+    private fun callTool(
+        id: JsonElement,
+        params: JsonObject,
+        project: Project?,
+        protocolVersion: String,
+    ): McpDispatchResult {
         if (params.keySet().any { it !in setOf("name", "arguments") }) {
             return protocolError(200, id, JsonRpcErrorCode.INVALID_PARAMS, "Unknown tools/call parameter")
         }
@@ -187,7 +227,9 @@ internal class McpJsonRpcDispatcher(
                     addProperty("text", callResult.text)
                 })
             })
-            callResult.structuredContent?.let { add("structuredContent", it.deepCopy()) }
+            if (McpProtocol.supportsStructuredToolContent(protocolVersion)) {
+                callResult.structuredContent?.let { add("structuredContent", it.deepCopy()) }
+            }
             addProperty("isError", callResult.isError)
         }
         return success(id, result)

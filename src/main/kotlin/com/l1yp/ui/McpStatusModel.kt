@@ -66,8 +66,9 @@ internal object McpConfigurationFormatter {
         val tools = definitions.joinToString("\n") { "  - ${it.name}" }.ifBlank { "  （全部已禁用）" }
         return """
             Endpoint: $endpoint
-            Protocol: MCP 2025-11-25
+            Protocol: MCP ${McpProtocol.STREAMABLE_HTTP_VERSIONS.joinToString()}
             Transport: Streamable HTTP
+            Legacy SSE: $endpoint/sse (MCP ${McpProtocol.LEGACY_HTTP_SSE_2024_11_05})
             Authorization: Bearer <project-token>
             Tools:
             $tools
